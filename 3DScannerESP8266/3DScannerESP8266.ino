@@ -1,3 +1,7 @@
+//code by bitluni
+//public domain
+//I don't mind if you give me a shout out :-)
+
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
@@ -14,8 +18,10 @@ const char *renderer =
 
 ESP8266WebServer server(80);
 
+//servo instances
 Servo yawServo;
 Servo pitchServo;
+
 /************** configuration *************/
 const int pinTrigger = 12; //D6
 const int pinEcho = 13; //D7
@@ -27,17 +33,20 @@ const bool useTimeOfFlight = true;  //false: ultrasonic, true: tof
 //angle step per measurement. 1 best resolution (slowest), >1 lower res
 const int stepYaw = 1;
 const int stepPitch = 1;
+//readings to avarage per position (more readings give softer results but take longer)
+const int avgCount = 1;
 
 // limit scan range
-const int yawRange[] = {0, 180};
-const int pitchRange[] = {0, 181};
+const int yawRange[] = {0, 80};
+const int pitchRange[] = {0, 90};
 
 // limit scan distance
-const float validRange[] = {0.05, 5.0};
+const float validRange[] = {0.05, 0.30};
+const float offset = 0.012;
 
 // add offset to position calculation
-const float yawOffset = 0;
-const float pitchOffset = 0;
+const float yawOffset = -45;
+const float pitchOffset = -45;
 
 // delays for scans
 static const int fixedDelay = 20;
@@ -73,39 +82,65 @@ void scan()
 {  
   yawServo.attach(pinServoYaw);
   pitchServo.attach(pinServoPitch);
-  yawServo.write(0);
-  pitchServo.write(0);
-  delay(1000);
+  //this centers the servos according the range
+  yawServo.write((yawRange[0] + yawRange[1]) / 2);
+  pitchServo.write((pitchRange[0] + pitchRange[1]) / 2);
+  delay(3000);
+
+  //opening a file for write.. overwriting if exists
   File f = SPIFFS.open("/distance.js", "w");
   if (!f) 
   {
     Serial.println("file open failed");
     return;
   }
+  //writing a JS array directly into the file, this get's included in the HTML
   f.print("var vertices = new Float32Array([");
-  int pitch = pitchRange[0];
+  //scanning the range
   for(int yaw = yawRange[0]; yaw < yawRange[1]; yaw += stepYaw)
   {
+    //returning to the starting position of the pitch column
     yawServo.write(yaw);
-    delay(50);
-    bool back = pitch != pitchRange[0];
-    for(; (back || pitch < pitchRange[1]) && (!back || pitch >= pitchRange[0]); pitch += back ? -stepPitch : stepPitch)
+    pitchServo.write(pitchRange[0]);
+    delay(1000);
+
+    //proceeding the pitch
+    for(int pitch = pitchRange[0]; pitch < pitchRange[1]; pitch += stepPitch)
     {
       pitchServo.write(pitch);
       float d;
+
+      //this part could be simplified.. ended up being similar for both sensor types
       if(useTimeOfFlight)
       {
+        //a delay to have time to reach the position
         delay(fixedDelay + delayPerStep  * stepPitch);
-        d = readDistanceTimeOfFlight();
-        if(d < validRange[0] || d > validRange[1]) d = 0;
+        //averaging several readings 
+        float avg = 0;
+        int svgc = 0;
+        for(int i = 0; i < avgCount; i++)
+        {
+          delay(40);
+          float d = readDistanceTimeOfFlight();
+          //only consider redings within the range
+          if(d >= validRange[0] && d <= validRange[1])
+          {
+            avg +=d;
+            svgc++;
+          }
+        }
+        //calculate the averege
+        d = avg / max(1, svgc);        
       }
       else
       {
+        //similar as above
         delay(fixedDelay + delayPerStep * stepPitch);
         float avg = 0;
         int svgc = 0;
-        for(int i = 0; i < 3; i++)
+        for(int i = 0; i < avgCount; i++)
         {
+          delay(10);
           float d = readDistanceUltrasound();
           if(d >= validRange[0] && d <= validRange[1])
           {
@@ -115,23 +150,24 @@ void scan()
         }
         d = avg / max(1, svgc);
       }
+      //if reading was not out of range, calculate the position and write to the JS array in the file... (and on the serial output)
       if(d > 0)
       {
         float yawf = (yaw + yawOffset) * M_PI / 180;
         float pitchf = (pitch + pitchOffset) * M_PI / 180;
-        float x = -sin(yawf) * d * cos(pitchf);
-        float y = cos(yawf) * d * cos(pitchf);
-        float z = d * sin(pitchf);
+        float od = offset + d;
+        float x = -sin(yawf) * od * cos(pitchf);
+        float y = cos(yawf) * od * cos(pitchf);
+        float z = od * sin(pitchf);
         String vertex = String(x, 3) + ", " + String(y, 3) + ", " + String(z, 3);
         Serial.println(vertex);
         f.print(vertex + ", ");
       }
       else
         Serial.println("far");
-
     }
-    pitch -= back ? -stepPitch : stepPitch;
   }
+  //closing arrays and files
   f.print("]);");
   f.close();
   yawServo.detach();

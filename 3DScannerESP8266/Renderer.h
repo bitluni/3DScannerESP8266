@@ -6,17 +6,23 @@ R"bitluni(
 //https://blogoben.wordpress.com/2011/04/16/webgl-basics-4-wireframe-3d-object/ 
   
   fragmentShaderCode=
+  'varying mediump float d;' +
   'void main(void)' + 
   '{' +
-  '  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);' +
+  '  gl_FragColor = vec4(1.0 - d, 0.0, d, 1.0);' +
   '}';
 
   vertexShaderCode=
-  'attribute vec3 ppos;' +
   'uniform mat4 mvp;' +
+  'uniform float scaler;' +
+  'attribute vec3 ppos;' +
+  'varying mediump float d;' +
   'void main(void)' +
   '{' +
+  //'  vec3 v = ppos * scaler;' +
+  '  vec4 v = mvp * vec4(ppos.x, ppos.y, ppos.z, 1.0);' +
   '  gl_Position = mvp * vec4(ppos.x, ppos.y, ppos.z, 1.0);' +
+  '  d = sqrt(dot(v.xyz, v.xyz));' +
   '  gl_PointSize = 3.0;' +
   '}';
 
@@ -26,7 +32,7 @@ var gl = null; // GL context
 var program; // The program object used in the GL context
 var running = true; // True when the canvas is periodically refreshed
 
-var method = 0;
+var method = 1;
 var scale = 1;
 
 function methodChange()
@@ -114,13 +120,16 @@ function draw()
   {
   alert('Error during uniform address retrieval');running=false;return;
   }  
+  //var as = gl.getUniformLocation(program, "scaler");
 
   var rot = rotationMatrix(angle, 0, 0, 1);
   var t = rotationMatrix(tilt, nx, ny, nz);
   var sc = scaleMatrix(scale); 
   var mat = multMatrix(multMatrix(rot, t), sc); 
+  //var mat = multMatrix(rot, t); 
 
   gl.uniformMatrix4fv(amvp, false, mat);
+  //gl.uniform1f(as, false, scale);
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
