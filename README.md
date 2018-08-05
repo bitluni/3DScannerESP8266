@@ -2,7 +2,11 @@
 This mini project shows an attempt to built a cheap areal 3D scanner. The two attempts use an ultrasonic transducer and a time-of-flight sensor.
 The project ist Arduino based with the ESP8266 board extension.
 
+Part 1
 https://youtu.be/vwUGPjQ_5t4
+
+Part 2
+https://youtu.be/mRR7VgC_DWg
 
 For the time-of-flight sensor, the Adafruit_VL53L0X extension is used.
 
@@ -20,3 +24,6 @@ Big thanks for the nice tutorial!
 
 # License
 PUBLIC DOMAIN 
+I don't mind if you give me a shout out :-)
+
+- bitluni
