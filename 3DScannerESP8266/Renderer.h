@@ -1,6 +1,6 @@
 R"bitluni(
 <html>
-  <header>
+  <head>
   <script>
 //inspired by:
 //https://blogoben.wordpress.com/2011/04/16/webgl-basics-4-wireframe-3d-object/ 
@@ -174,7 +174,7 @@ function multMatrix(m1, m2)
 }
   </script> 
   <script src="vertices.js"></script>  
-  </header>
+  </head>
   <body onload="start();">
   <canvas width="1000" height="1000">
   </canvas><br>
